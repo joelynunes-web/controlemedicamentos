@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de medicação</title>
+<style>
+  :root{
+    --bg:#F1F5F7; --surface:#FFFFFF; --ink:#12212B; --muted:#586873; --line:#D9E1E6; --foil:#E6ECF0;
+    --ok:#1F8A5B; --late:#C0262D; --soon:#B45309;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0D161C; --surface:#16232B; --ink:#E8EFF3; --muted:#9AABB6; --line:#28383F; --foil:#1F2F38;
+           --ok:#4CC38A; --late:#FF7B80; --soon:#F2A65A; }
+  }
+  .m-mefex{ --c:#2F6FDE; --on:#fff; }
+  .m-neosoro{ --c:#0E8F7E; --on:#fff; }
+  .m-codein{ --c:#8446D4; --on:#fff; }
+  .m-hexomedine{ --c:#E8920A; --on:#201400; }
+  @media (prefers-color-scheme: dark){
+    .m-mefex{ --c:#6B9BFF; --on:#08162F; }
+    .m-neosoro{ --c:#3CC9B5; --on:#032621; }
+    .m-codein{ --c:#B58BF2; --on:#1C0B36; }
+    .m-hexomedine{ --c:#F5A93B; --on:#201400; }
+  }
+
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Avenir Next","Segoe UI","Helvetica Neue",system-ui,sans-serif;
+    font-size:16px; line-height:1.45;
+  }
+  button{ font:inherit; cursor:pointer; }
+  .num{ font-variant-numeric:tabular-nums; }
+  :focus-visible{ outline:3px solid var(--c, #2F6FDE); outline-offset:2px; border-radius:6px; }
+
+  .wrap{ max-width:1100px; margin:0 auto; padding:20px 16px 48px; }
+
+  /* Cabeçalho */
+  .top{ display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; justify-content:space-between; margin-bottom:16px; }
+  .top h1{ margin:0; font-size:26px; letter-spacing:-.02em; }
+  .top p{ margin:2px 0 0; color:var(--muted); }
+  .clock{ text-align:right; }
+  .clock b{ display:block; font-size:30px; letter-spacing:-.02em; line-height:1; }
+  .clock span{ color:var(--muted); font-size:14px; }
+  .linkbtn{ background:none; border:1px solid var(--line); color:var(--ink); padding:6px 12px; border-radius:999px; font-size:14px; margin-top:6px; }
+  .linkbtn:hover{ background:var(--foil); }
+
+  .banner{ background:color-mix(in srgb, var(--soon) 14%, var(--surface)); border:1px solid color-mix(in srgb, var(--soon) 45%, transparent);
+    border-radius:12px; padding:10px 14px; margin-bottom:14px; font-size:14px; }
+
+  /* Próxima dose */
+  .hero{ background:var(--surface); border:1px solid var(--line); border-left:10px solid var(--c, var(--muted));
+    border-radius:16px; padding:18px 20px; display:grid; gap:14px; grid-template-columns:1fr auto; align-items:center; margin-bottom:18px; }
+  .hero small{ color:var(--muted); font-size:14px; }
+  .hero h2{ margin:2px 0 0; font-size:30px; letter-spacing:-.02em; }
+  .hero .when{ font-size:44px; font-weight:700; letter-spacing:-.03em; line-height:1.05; margin-top:6px; }
+  .hero .rel{ font-size:18px; font-weight:600; }
+  .hero .rel.late{ color:var(--late); }
+  .hero .rel.soon{ color:var(--soon); }
+  .hero .what{ color:var(--muted); margin-top:4px; }
+  .hero .also{ margin-top:10px; font-size:14px; color:var(--muted); }
+  .hero .cta{ display:flex; flex-direction:column; gap:8px; min-width:190px; }
+  .btn{ border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:12px; padding:10px 14px; font-weight:600; }
+  .btn:hover{ background:var(--foil); }
+  .btn.primary{ background:var(--c); color:var(--on); border-color:transparent; padding:14px 18px; font-size:17px; }
+  .btn.primary:hover{ filter:brightness(1.07); background:var(--c); }
+  .btn.small{ padding:7px 11px; font-size:14px; border-radius:10px; }
+  .btn.quiet{ font-weight:500; color:var(--muted); }
+  .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+
+  /* Layout */
+  .grid{ display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:18px; align-items:start; }
+  .col-meds{ display:grid; gap:16px; }
+  .col-today{ position:sticky; top:12px; }
+  h3.sec{ margin:0 0 10px; font-size:18px; letter-spacing:-.01em; }
+
+  /* Cartões de medicação */
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 18px; }
+  .card header{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:space-between; }
+  .card h4{ margin:0; font-size:20px; letter-spacing:-.01em; display:flex; align-items:center; gap:10px; }
+  .swatch{ width:12px; height:12px; border-radius:50%; background:var(--c); display:inline-block; }
+  .str{ color:var(--muted); font-weight:500; font-size:15px; }
+  .chip{ display:inline-block; font-size:12.5px; font-weight:600; padding:2px 10px; border-radius:999px;
+    background:color-mix(in srgb, var(--c, var(--muted)) 16%, transparent); color:var(--ink); }
+  .chip.ok{ background:color-mix(in srgb, var(--ok) 18%, transparent); color:var(--ok); }
+  .chip.late{ background:color-mix(in srgb, var(--late) 16%, transparent); color:var(--late); }
+  .chip.soon{ background:color-mix(in srgb, var(--soon) 16%, transparent); color:var(--soon); }
+  .chip.mute{ background:var(--foil); color:var(--muted); }
+
+  .prog{ display:flex; align-items:center; gap:10px; margin:12px 0 10px; font-size:14px; color:var(--muted); }
+  .bar{ flex:1; height:8px; background:var(--foil); border-radius:99px; overflow:hidden; }
+  .bar i{ display:block; height:100%; background:var(--c); border-radius:99px; transition:width .4s ease; }
+
+  /* Cartela de doses */
+  .blister{ display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 14px; }
+  .dg{ display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .dg .pill{ display:flex; gap:4px; padding:5px 6px; background:var(--foil); border-radius:14px; }
+  .dg em{ font-style:normal; font-size:11px; color:var(--muted); }
+  .dot{ width:22px; height:22px; border-radius:50%; border:2px solid var(--c); background:var(--surface);
+    display:grid; place-items:center; font-size:12px; line-height:1; color:var(--on); font-weight:700; }
+  .dot.taken{ background:var(--c); }
+  .dot.skipped{ border-style:dashed; border-color:var(--muted); color:var(--muted); background:transparent; }
+  .dot.next{ box-shadow:0 0 0 3px color-mix(in srgb, var(--c) 35%, transparent); }
+  .dot.overdue{ border-color:var(--late); box-shadow:0 0 0 3px color-mix(in srgb, var(--late) 30%, transparent); animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse{ 50%{ box-shadow:0 0 0 6px color-mix(in srgb, var(--late) 10%, transparent); } }
+  @media (prefers-reduced-motion: reduce){ .dot.overdue{ animation:none; } .bar i{ transition:none; } }
+
+  .facts{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 18px; margin:0 0 12px; font-size:14.5px; }
+  .facts div{ display:flex; flex-direction:column; }
+  .facts dt{ color:var(--muted); font-size:13px; }
+  .facts dd{ margin:0; font-weight:600; }
+  .tip{ font-size:14px; color:var(--muted); background:var(--foil); border-radius:10px; padding:8px 12px; margin:0 0 12px; }
+  .actions{ display:flex; flex-wrap:wrap; gap:8px; }
+  details{ margin-top:12px; }
+  summary{ cursor:pointer; color:var(--muted); font-size:14px; padding:4px 0; }
+  .hist{ list-style:none; margin:8px 0 0; padding:0; font-size:14px; max-height:260px; overflow:auto; border-top:1px solid var(--line); }
+  .hist li{ display:grid; grid-template-columns:34px 1fr auto; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); }
+  .hist .n{ color:var(--muted); }
+
+  /* Agenda */
+  .today{ background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 18px; }
+  .sum{ display:flex; align-items:center; gap:10px; font-size:14px; color:var(--muted); margin-bottom:6px; }
+  .daytitle{ margin:14px 0 6px; font-size:14px; font-weight:700; color:var(--muted); }
+  .rows{ list-style:none; margin:0; padding:0; }
+  .row{ display:grid; grid-template-columns:54px 12px 1fr auto; gap:10px; align-items:center; padding:9px 0; border-bottom:1px solid var(--line); }
+  .row:last-child{ border-bottom:0; }
+  .row .t{ font-weight:700; }
+  .row .d{ width:12px; height:12px; border-radius:50%; background:var(--c); }
+  .row.pending .d{ background:transparent; border:2px solid var(--c); }
+  .row.skipped .d{ background:transparent; border:2px dashed var(--muted); }
+  .row .nm{ font-weight:600; line-height:1.2; }
+  .row .ds{ font-size:13px; color:var(--muted); }
+  .row.done .nm, .row.done .t{ color:var(--muted); }
+  .row.done .nm{ text-decoration:line-through; text-decoration-thickness:1px; }
+  .empty{ color:var(--muted); font-size:14px; padding:8px 0; }
+
+  footer{ margin-top:26px; font-size:13px; color:var(--muted); display:flex; flex-wrap:wrap; gap:10px 20px; justify-content:space-between; align-items:center; }
+
+  dialog{ border:1px solid var(--line); border-radius:16px; background:var(--surface); color:var(--ink); padding:20px; width:min(92vw,380px); }
+  dialog::backdrop{ background:rgba(8,16,22,.55); }
+  dialog h3{ margin:0 0 4px; }
+  dialog p{ margin:0 0 12px; color:var(--muted); font-size:14px; }
+  dialog input{ width:100%; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--ink); }
+  dialog .err{ color:var(--late); font-size:14px; min-height:20px; margin:6px 0 0; }
+  dialog .btns{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+
+  @media (max-width:860px){
+    .grid{ grid-template-columns:1fr; }
+    .col-today{ position:static; order:-1; }
+    .hero{ grid-template-columns:1fr; }
+    .hero .cta{ min-width:0; }
+    .hero .when{ font-size:38px; }
+    .clock{ text-align:left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Controle de medicação</h1>
+      <p>Tratamento iniciado em 28/10/2026</p>
+    </div>
+    <div class="clock">
+      <b class="num" id="clock">--:--</b>
+      <span id="dateline"></span><br>
+      <button class="linkbtn" data-act="notify" id="notifyBtn">Ativar lembretes</button>
+    </div>
+  </div>
+
+  <div id="banner"></div>
+  <section id="hero" aria-live="polite"></section>
+
+  <div class="grid">
+    <section class="col-meds">
+      <h3 class="sec" style="margin-bottom:-6px">Medicações</h3>
+      <div id="meds" class="col-meds"></div>
+    </section>
+    <aside class="col-today">
+      <div class="today" id="today"></div>
+    </aside>
+  </div>
+
+  <footer>
+    <span>Este painel é apenas um apoio de organização e não substitui a orientação do médico. Em caso de dúvida ou piora, procure atendimento.</span>
+    <button class="btn small quiet" data-act="reset">Reiniciar controle</button>
+  </footer>
+</div>
+
+<dialog id="dlg">
+  <h3 id="dlgTitle">Registrar dose</h3>
+  <p>Informe quando a dose foi tomada. Os próximos horários serão recalculados a partir dele.</p>
+  <input type="datetime-local" id="dlgTime">
+  <div class="err" id="dlgErr"></div>
+  <div class="btns">
+    <button class="btn" id="dlgCancel" type="button">Cancelar</button>
+    <button class="btn primary" id="dlgOk" type="button" style="--c:#2F6FDE;--on:#fff;padding:10px 16px;font-size:16px">Registrar dose</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  const HOUR = 3600000, KEY = 'controle-medicacao-v1';
+
+  // ---- Receita médica ----
+  const MEDS = [
+    { id:'mefex', cls:'m-mefex', name:'Mefex', strength:'500 mg · comprimido',
+      intervalH:12, days:10, first:new Date(2026,9,28,15,0).getTime(),
+      dose:'1 comprimido via oral', perDay:'2 comprimidos (1.000 mg)',
+      how:'Tomar de 12 em 12 horas por 10 dias.',
+      tip:'Tomar com o estômago cheio: após o café da manhã e após o jantar.' },
+    { id:'neosoro', cls:'m-neosoro', name:'Neosoro', strength:'0,5 mg/mL · solução nasal',
+      intervalH:12, days:5, first:new Date(2026,9,28,15,0).getTime(),
+      dose:'2 gotas em cada narina', perDay:'8 gotas (4 em cada narina)',
+      how:'Pingar de 12 em 12 horas por 5 dias.',
+      tip:'Não prolongue o uso além dos 5 dias prescritos.' },
+    { id:'codein', cls:'m-codein', name:'Codein', strength:'3 mg/mL · solução oral',
+      intervalH:8, days:7, first:new Date(2026,9,28,15,27).getTime(),
+      dose:'10 mL via oral (30 mg)', perDay:'30 mL (90 mg)',
+      how:'Tomar de 8 em 8 horas por até 7 dias.',
+      tip:'Pode causar sonolência. Use seringa dosadora ou copo medida para garantir os 10 mL.' },
+    { id:'hexomedine', cls:'m-hexomedine', name:'Hexomedine', strength:'spray para garganta',
+      intervalH:6, days:null, first:new Date(2026,9,28,16,0).getTime(),
+      dose:'5 jatos na garganta', perDay:'20 jatos',
+      how:'Aplicar de 6 em 6 horas até a melhora.',
+      tip:'Sem prazo fixo: use o botão "Melhorei, encerrar" quando os sintomas passarem. Se não melhorar, volte ao médico.' }
+  ];
+  const byId = Object.fromEntries(MEDS.map(m => [m.id, m]));
+
+  // ---- Estado e persistência ----
+  let persisted = true;
+  function seed(){
+    const s = { meds:{} };
+    MEDS.forEach(m => s.meds[m.id] = { log:[{ status:'taken', time:m.first, sched:m.first }], ended:false });
+    return s;
+  }
+  function load(){
+    try{
+      const raw = localStorage.getItem(KEY);
+      if(!raw) return seed();
+      const s = JSON.parse(raw), base = seed();
+      MEDS.forEach(m => { if(!s.meds || !s.meds[m.id]) (s.meds = s.meds || {})[m.id] = base.meds[m.id]; });
+      return s;
+    }catch(e){ persisted = false; return seed(); }
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ persisted = false; } }
+  let S = load();
+
+  // ---- Utilidades ----
+  const $ = s => document.querySelector(s);
+  const fmtT = ms => new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const fmtD = ms => new Date(ms).toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'}).replace('.','');
+  const fmtDT = ms => fmtD(ms) + ', ' + fmtT(ms);
+  function dur(ms){
+    const m = Math.round(Math.abs(ms)/60000);
+    if(m < 1) return 'agora';
+    const h = Math.floor(m/60), r = m % 60;
+    if(h === 0) return m + ' min';
+    return r ? h + 'h ' + String(r).padStart(2,'0') + 'min' : h + 'h';
+  }
+  function rel(ms){
+    const d = ms - Date.now();
+    if(Math.abs(d) < 60000) return { t:'é agora', c:'soon' };
+    if(d < 0) return { t:'atrasada há ' + dur(d), c:'late' };
+    return { t:'em ' + dur(d), c: d <= 30*60000 ? 'soon' : '' };
+  }
+  function toLocalInput(ms){
+    const d = new Date(ms - new Date(ms).getTimezoneOffset()*60000);
+    return d.toISOString().slice(0,16);
+  }
+
+  // ---- Cálculo do cronograma ----
+  // Doses já registradas ficam fixas; as próximas partem do horário real da última dose.
+  function info(m){
+    const s = S.meds[m.id], iv = m.intervalH*HOUR, per = 24/m.intervalH, h = s.log.length;
+    const fixed = m.days ? Math.floor(m.days*24/m.intervalH) : null;
+    const base = h ? s.log[h-1].time : m.first - iv;
+    const total = s.ended ? h : (fixed !== null ? fixed : Math.ceil((h + per*2)/per)*per);
+    const list = s.log.map((l,i) => ({ n:i, status:l.status, time:l.time, sched:l.sched }));
+    for(let i=h; i<total; i++) list.push({ n:i, status:'pending', time:null, sched:base + (i-h+1)*iv });
+    const next = h < total ? list[h] : null;
+    const taken = s.log.filter(l => l.status === 'taken').length;
+    const skipped = h - taken;
+    return { s, iv, per, h, fixed, total, list, next, taken, skipped,
+             complete: fixed !== null && h >= fixed, ended: s.ended };
+  }
+
+  // ---- Ações ----
+  function take(id, when){
+    const m = byId[id], i = info(m), d = i.next;
+    if(!d) return false;
+    if(d.sched - when > HOUR && !confirm(m.name + ' estava prevista para ' + fmtT(d.sched) + '. Registrar a dose antecipada?')) return false;
+    S.meds[id].log.push({ status:'taken', time:when, sched:d.sched });
+    save(); render(); return true;
+  }
+  function skip(id){
+    const m = byId[id], d = info(m).next; if(!d) return;
+    if(!confirm('Pular a dose de ' + m.name + ' das ' + fmtT(d.sched) + '? Os próximos horários continuam a partir dela.')) return;
+    S.meds[id].log.push({ status:'skipped', time:d.sched, sched:d.sched });
+    save(); render();
+  }
+  function undo(id){
+    const m = byId[id], s = S.meds[id];
+    if(!s.log.length) return;
+    const l = s.log[s.log.length-1];
+    if(!confirm('Desfazer o registro de ' + m.name + ' (' + (l.status==='taken'?'tomada':'pulada') + ' às ' + fmtT(l.time) + ')?')) return;
+    s.log.pop(); s.ended = false; save(); render();
+  }
+  function toggleEnd(id){
+    const m = byId[id], s = S.meds[id];
+    if(!s.ended && !confirm('Encerrar o tratamento com ' + m.name + '? As doses futuras serão removidas da agenda.')) return;
+    s.ended = !s.ended; save(); render();
+  }
+  function reset(){
+    if(!confirm('Apagar todos os registros e voltar ao estado inicial (apenas a primeira dose de cada medicação)?')) return;
+    S = seed(); save(); render();
+  }
+
+  // Diálogo para horário personalizado
+  let dlgMed = null;
+  function openDlg(id){
+    dlgMed = id;
+    $('#dlgTitle').textContent = 'Registrar ' + byId[id].name;
+    $('#dlgTime').value = toLocalInput(Date.now());
+    $('#dlgErr').textContent = '';
+    $('#dlg').showModal();
+  }
+  $('#dlgCancel').onclick = () => $('#dlg').close();
+  $('#dlgOk').onclick = () => {
+    const v = $('#dlgTime').value; if(!v) return;
+    const when = new Date(v).getTime(), m = byId[dlgMed], i = info(m);
+    const last = i.h ? i.s.log[i.h-1].time : 0;
+    if(when > Date.now() + 5*60000){ $('#dlgErr').textContent = 'O horário não pode estar no futuro.'; return; }
+    if(when < last){ $('#dlgErr').textContent = 'Informe um horário depois da dose anterior (' + fmtDT(last) + ').'; return; }
+    if(take(dlgMed, when)) $('#dlg').close();
+  };
+
+  // ---- Lembretes ----
+  const notified = new Set();
+  function notifyLoop(){
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+    MEDS.forEach(m => {
+      const d = info(m).next; if(!d) return;
+      const k = m.id + ':' + d.n + ':' + d.sched;
+      if(d.sched <= Date.now() && !notified.has(k)){
+        notified.add(k);
+        try{ new Notification('Hora do ' + m.name, { body: m.dose + ' · previsto para ' + fmtT(d.sched) }); }catch(e){}
+      }
+    });
+  }
+  function notifyBtn(){
+    const b = $('#notifyBtn');
+    if(!('Notification' in window)){ b.style.display = 'none'; return; }
+    b.textContent = Notification.permission === 'granted' ? 'Lembretes ativos' : 'Ativar lembretes';
+    b.disabled = Notification.permission === 'granted';
+  }
+
+  // ---- Renderização ----
+  function renderHero(){
+    const cands = MEDS.map(m => ({ m, d:info(m).next })).filter(x => x.d).sort((a,b) => a.d.sched - b.d.sched);
+    const el = $('#hero');
+    if(!cands.length){
+      el.innerHTML = '<div class="hero" style="--c:var(--ok)"><div><small>Tudo em dia</small><h2>Nenhuma dose pendente</h2><div class="what">Todos os tratamentos foram concluídos ou encerrados.</div></div></div>';
+      return;
+    }
+    const f = cands[0], m = f.m, r = rel(f.d.sched);
+    const together = cands.slice(1).filter(x => x.d.sched - f.d.sched <= 30*60000);
+    const later = cands.slice(1).filter(x => !together.includes(x)).slice(0,2);
+    let also = '';
+    if(together.length) also += '<div class="also">No mesmo período: ' + together.map(x => '<b>' + x.m.name + '</b> (' + fmtT(x.d.sched) + ')').join(', ') + '</div>';
+    if(later.length) also += '<div class="also">Depois: ' + later.map(x => x.m.name + ' às ' + fmtT(x.d.sched)).join(' · ') + '</div>';
+    el.innerHTML =
+      '<div class="hero ' + m.cls + '">' +
+        '<div><small>Próxima dose</small><h2>' + m.name + '</h2>' +
+        '<div class="when num">' + fmtT(f.d.sched) + ' <span class="rel ' + r.c + '">' + r.t + '</span></div>' +
+        '<div class="what">' + m.dose + (m.id === 'mefex' ? ' · com o estômago cheio' : '') + '</div>' + also + '</div>' +
+        '<div class="cta"><button class="btn primary" data-act="take" data-med="' + m.id + '">Tomei agora</button>' +
+        '<button class="btn" data-act="other" data-med="' + m.id + '">Tomei em outro horário</button></div>' +
+      '</div>';
+  }
+
+  function dayItems(offset){
+    const a = new Date(); a.setHours(0,0,0,0); a.setDate(a.getDate()+offset);
+    const b = new Date(a); b.setDate(b.getDate()+1);
+    const out = [];
+    MEDS.forEach(m => info(m).list.forEach(d => {
+      const t = d.status === 'pending' ? d.sched : d.time;
+      if(t >= a.getTime() && t < b.getTime()) out.push({ m, d, t });
+    }));
+    return out.sort((x,y) => x.t - y.t);
+  }
+
+  function rowHtml(it){
+    const { m, d, t } = it, nextN = info(m).h, now = Date.now();
+    let right = '', cls = 'pending';
+    if(d.status === 'taken'){
+      cls = 'done';
+      right = '<span class="chip ok">Tomada ' + fmtT(d.time) + '</span>';
+    } else if(d.status === 'skipped'){
+      cls = 'skipped done';
+      right = '<span class="chip mute">Pulada</span>';
+    } else if(d.n === nextN){
+      const r = rel(d.sched);
+      right = '<button class="btn small" data-act="take" data-med="' + m.id + '">Tomei</button>';
+      if(d.sched < now) right = '<span class="chip late">' + r.t.replace('atrasada há','atraso') + '</span> ' + right;
+    } else {
+      right = '<span class="chip mute">Aguardando</span>';
+    }
+    let sub = m.dose;
+    if(d.status === 'taken' && Math.abs(d.time - d.sched) > 10*60000) sub += ' · previsto ' + fmtT(d.sched);
+    return '<li class="row ' + m.cls + ' ' + cls + '"><span class="t num">' + fmtT(t) + '</span><span class="d"></span>' +
+           '<div><div class="nm">' + m.name + '</div><div class="ds">' + sub + '</div></div><div>' + right + '</div></li>';
+  }
+
+  function renderToday(){
+    const t0 = dayItems(0), t1 = dayItems(1);
+    const done = t0.filter(x => x.d.status !== 'pending').length;
+    const late = t0.filter(x => x.d.status === 'pending' && x.d.n === info(x.m).h && x.d.sched < Date.now()).length;
+    const pct = t0.length ? Math.round(done/t0.length*100) : 0;
+    $('#today').innerHTML =
+      '<h3 class="sec">Agenda de hoje</h3>' +
+      '<div class="sum"><span class="num"><b style="color:var(--ink)">' + done + '</b> de ' + t0.length + ' doses</span>' +
+      '<div class="bar" style="--c:var(--ok)"><i style="width:' + pct + '%"></i></div>' +
+      (late ? '<span class="chip late">' + late + ' em atraso</span>' : '') + '</div>' +
+      '<ul class="rows">' + (t0.length ? t0.map(rowHtml).join('') : '<li class="empty">Nenhuma dose hoje.</li>') + '</ul>' +
+      '<div class="daytitle">Amanhã, ' + fmtD(Date.now() + 86400000) + '</div>' +
+      '<ul class="rows">' + (t1.length ? t1.map(rowHtml).join('') : '<li class="empty">Nenhuma dose prevista.</li>') + '</ul>';
+  }
+
+  function blister(m, i){
+    const nextN = i.h, now = Date.now(); let html = '', groups = {};
+    i.list.forEach(d => { (groups[Math.floor(d.n/i.per)] = groups[Math.floor(d.n/i.per)] || []).push(d); });
+    Object.keys(groups).forEach(g => {
+      html += '<div class="dg"><div class="pill">' + groups[g].map(d => {
+        const t = d.status === 'pending' ? d.sched : d.time;
+        const label = (d.status === 'taken' ? 'Tomada ' : d.status === 'skipped' ? 'Pulada ' : 'Prevista ') + fmtDT(t);
+        let c = 'dot ' + d.status, mark = d.status === 'taken' ? '✓' : d.status === 'skipped' ? '–' : '';
+        if(d.status === 'pending' && d.n === nextN){ c += d.sched < now ? ' next overdue' : ' next'; }
+        return '<span class="' + c + '" title="' + label + '">' + mark + '</span>';
+      }).join('') + '</div><em>dia ' + (+g+1) + '</em></div>';
+    });
+    return '<div class="blister" role="img" aria-label="Cartela de doses de ' + m.name + '">' + html + '</div>';
+  }
+
+  function renderMeds(){
+    $('#meds').innerHTML = MEDS.map(m => {
+      const i = info(m), now = Date.now();
+      const elapsed = Math.max(1, Math.floor((now - m.first)/(24*HOUR)) + 1);
+      let status = '<span class="chip">Em andamento</span>';
+      if(i.complete) status = '<span class="chip ok">Concluído</span>';
+      else if(i.ended) status = '<span class="chip mute">Encerrado</span>';
+      const dayTxt = m.days ? 'Dia ' + Math.min(elapsed, m.days) + ' de ' + m.days : 'Dia ' + elapsed + ' · até melhorar';
+      const pct = i.fixed ? Math.round(i.h / i.fixed * 100) : 0;
+      const prog = i.fixed
+        ? '<div class="prog"><span class="num">' + i.h + ' de ' + i.fixed + ' doses</span><div class="bar"><i style="width:' + pct + '%"></i></div><span class="num">' + pct + '%</span></div>'
+        : '<div class="prog"><span class="num">' + i.taken + ' doses tomadas até agora</span></div>';
+
+      let nextTxt = '—', lastTxt = '—';
+      if(i.next){ const r = rel(i.next.sched); nextTxt = fmtT(i.next.sched) + ' · <span class="chip ' + r.c + '">' + r.t + '</span>'; }
+      else nextTxt = i.complete ? 'Tratamento concluído' : 'Encerrado';
+      if(i.fixed){ const l = i.list[i.fixed-1]; lastTxt = fmtDT(l.status==='pending' ? l.sched : l.time); }
+      else lastTxt = i.ended ? 'Encerrado manualmente' : 'Quando melhorar';
+      const remaining = i.fixed ? Math.max(0, i.fixed - i.h) + ' doses' : 'indefinido';
+      const canAct = !!i.next;
+
+      const hist = i.list.map(d => {
+        const t = d.status === 'pending' ? d.sched : d.time;
+        const st = d.status === 'taken' ? '<span class="chip ok">Tomada</span>' : d.status === 'skipped' ? '<span class="chip mute">Pulada</span>' : '<span class="chip mute">Prevista</span>';
+        return '<li><span class="n num">#' + (d.n+1) + '</span><span class="num">' + fmtDT(t) + '</span>' + st + '</li>';
+      }).join('');
+
+      return '<article class="card ' + m.cls + '"><header><h4><span class="swatch"></span>' + m.name + ' <span class="str">' + m.strength + '</span></h4>' +
+        '<div>' + status + ' <span class="chip mute">' + dayTxt + '</span></div></header>' +
+        prog + blister(m, i) +
+        '<dl class="facts">' +
+          '<div><dt>Próxima dose</dt><dd>' + nextTxt + '</dd></div>' +
+          '<div><dt>Cada dose</dt><dd>' + m.dose + '</dd></div>' +
+          '<div><dt>Intervalo</dt><dd>De ' + m.intervalH + ' em ' + m.intervalH + ' horas</dd></div>' +
+          '<div><dt>Total por dia</dt><dd>' + m.perDay + '</dd></div>' +
+          '<div><dt>Última dose prevista</dt><dd class="num">' + lastTxt + '</dd></div>' +
+          '<div><dt>Doses restantes</dt><dd>' + remaining + '</dd></div>' +
+        '</dl>' +
+        '<p class="tip"><b>Receita:</b> ' + m.how + ' ' + m.tip + '</p>' +
+        '<div class="actions">' +
+          '<button class="btn small" style="background:var(--c);color:var(--on);border-color:transparent" data-act="take" data-med="' + m.id + '"' + (canAct ? '' : ' disabled') + '>Tomei agora</button>' +
+          '<button class="btn small" data-act="other" data-med="' + m.id + '"' + (canAct ? '' : ' disabled') + '>Outro horário</button>' +
+          '<button class="btn small" data-act="skip" data-med="' + m.id + '"' + (canAct ? '' : ' disabled') + '>Pular dose</button>' +
+          '<button class="btn small quiet" data-act="undo" data-med="' + m.id + '"' + (i.h ? '' : ' disabled') + '>Desfazer última</button>' +
+          (m.days === null || i.ended
+            ? '<button class="btn small quiet" data-act="end" data-med="' + m.id + '">' + (i.ended ? 'Retomar tratamento' : 'Melhorei, encerrar') + '</button>'
+            : '') +
+        '</div>' +
+        '<details><summary>Histórico e próximas doses</summary><ul class="hist">' + hist + '</ul></details>' +
+      '</article>';
+    }).join('');
+  }
+
+  function render(){
+    const now = new Date();
+    $('#clock').textContent = fmtT(now.getTime());
+    $('#dateline').textContent = now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+    $('#banner').innerHTML = persisted ? '' :
+      '<div class="banner">Os registros não estão sendo salvos neste modo de visualização. Baixe o arquivo e abra-o no navegador para manter o histórico ao fechar a página.</div>';
+    renderHero(); renderToday(); renderMeds();
+    const late = MEDS.filter(m => { const d = info(m).next; return d && d.sched < Date.now(); }).length;
+    document.title = (late ? '(' + late + ') ' : '') + 'Controle de medicação';
+    notifyBtn();
+  }
+
+  // ---- Eventos ----
+  document.body.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if(!b || b.disabled) return;
+    const id = b.dataset.med;
+    switch(b.dataset.act){
+      case 'take': take(id, Date.now()); break;
+      case 'other': openDlg(id); break;
+      case 'skip': skip(id); break;
+      case 'undo': undo(id); break;
+      case 'end': toggleEnd(id); break;
+      case 'reset': reset(); break;
+      case 'notify':
+        if('Notification' in window) Notification.requestPermission().then(() => { notifyBtn(); notifyLoop(); });
+        break;
+    }
+  });
+
+  render();
+  setInterval(() => { if(!$('#dlg').open){ render(); } notifyLoop(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) render(); });
+})();
+</script>
+</body>
+</html>
